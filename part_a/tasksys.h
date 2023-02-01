@@ -2,6 +2,9 @@
 #define _TASKSYS_H
 
 #include "itasksys.h"
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -34,6 +37,23 @@ class TaskSystemParallelSpawn: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+    
+    private:
+        std::thread *threads;
+        int num_threads_;
+};
+
+class ThreadState
+{
+    public:
+        std::mutex *mutex_;
+        std::condition_variable *finished_;
+        IRunnable *runnable_;
+        int todo_number;
+        int done_number;
+        int total_number;
+        ThreadState();
+        ~ThreadState();
 };
 
 /*
@@ -47,10 +67,31 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         TaskSystemParallelThreadPoolSpinning(int num_threads);
         ~TaskSystemParallelThreadPoolSpinning();
         const char* name();
+        void threadRun();
         void run(IRunnable* runnable, int num_total_tasks);
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+    
+    private:
+        std::thread *threads;
+        int num_threads_;
+        ThreadState *state_;
+        bool killed;
+};
+
+class ThreadStateCondition
+{
+    public:
+        std::mutex *mutex_;
+        std::mutex *done_mutex_;
+        std::condition_variable *finished_;
+        IRunnable *runnable_;
+        int todo_number;
+        int done_number;
+        int total_number;
+        ThreadStateCondition();
+        ~ThreadStateCondition();
 };
 
 /*
@@ -64,10 +105,19 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         TaskSystemParallelThreadPoolSleeping(int num_threads);
         ~TaskSystemParallelThreadPoolSleeping();
         const char* name();
+        void threadRun();
         void run(IRunnable* runnable, int num_total_tasks);
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+
+    private:
+        std::thread *threads;
+        int num_threads_;
+        ThreadStateCondition *state_;
+        std::condition_variable *has_;
+        bool killed;
+        int threads_count_;
 };
 
 #endif
