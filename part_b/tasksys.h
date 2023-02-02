@@ -3,6 +3,14 @@
 
 #include "itasksys.h"
 
+#include <mutex>
+#include <condition_variable>
+
+#include <deque>
+#include <map>
+#include <set>
+#include <thread>
+
 /*
  * TaskSystemSerial: This class is the student's implementation of a
  * serial task execution engine.  See definition of ITaskSystem in
@@ -59,6 +67,27 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
  * a thread pool. See definition of ITaskSystem in
  * itasksys.h for documentation of the ITaskSystem interface.
  */
+
+class Task {
+    public:
+        TaskID task_id;
+
+        int to_do_num;
+        int finished_num;
+        int total_num;
+
+        IRunnable* runnable_;
+
+        std::set<TaskID> left_deps;
+
+        Task(TaskID task_id, int num_total_tasks, IRunnable* runnable, const std::vector<TaskID>& deps): task_id(task_id), 
+                                                                                                        to_do_num(0), 
+                                                                                                        finished_num(0), 
+                                                                                                        total_num(num_total_tasks), 
+                                                                                                        runnable_(runnable), 
+                                                                                                        left_deps(deps.begin(), deps.end()) {}
+};
+
 class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
     public:
         TaskSystemParallelThreadPoolSleeping(int num_threads);
@@ -68,6 +97,22 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+    private:
+        int current_id;
+        std::map<TaskID, Task*> task_id_to_task;
+        std::vector<TaskID> waiting_task;
+        std::deque<TaskID> ready_task;
+        int running_task;
+        std::set<TaskID> finished_task;
+
+        std::mutex* run_mutex;
+        std::condition_variable* run_cv;
+        std::condition_variable* finished_cv;
+
+        int num_threads_;
+        std::thread* pool;
+        void runthread();
+        bool killed;
 };
 
 #endif
